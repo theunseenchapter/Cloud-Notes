@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import { doc, deleteDoc } from "firebase/firestore";
@@ -19,7 +20,7 @@ const Dashboard= () => {
   const [noteContent, setNoteContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [setAttachment] = useState(null);
+  const [attachment,setAttachment] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   
