@@ -27,6 +27,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/login" element={<Login setUser={setUser} />} />
         <Route path="/" element={!user ? <Login setUser={setUser} /> : <Navigate to="/dashboard" />} />
         <Route path="/dashboard" element={user ? <Dashboard user={user} setUser={setUser} /> : <Navigate to="/" />} />
       </Routes>
