@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { db, auth } from "../firebaseConfig";
+import { doc, deleteDoc } from "firebase/firestore";
+import { updateDoc } from "firebase/firestore";
 // Pastel color palette for notes
 const pastelColors = [
   '#fff8e1', '#f3e5f5', '#e1f5fe', '#e8f5e9', '#fff3e0', 
@@ -28,17 +31,25 @@ const Dashboard= () => {
   
   // Load notes from localStorage on initial render
   useEffect(() => {
-    const savedNotes = localStorage.getItem('notes');
-    if (savedNotes) {
-      setNotes(JSON.parse(savedNotes));
-    }
-    
-    // Check for saved theme preference
+    const fetchNotes = async () => {
+      if (!auth.currentUser) return;
+  
+      const q = query(collection(db, "notes"), where("userId", "==", auth.currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      const fetchedNotes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setNotes(fetchedNotes);
+    };
+
+    fetchNotes(); // Moved outside the function to avoid infinite recursion
+  }, [auth.currentUser]); // `auth.currentUser` is not a valid dependency; use `onAuthStateChanged`
+
+  useEffect(() => {
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme) {
       setDarkMode(JSON.parse(savedTheme));
     }
-  }, []);
+}, []); // Separated concerns
+
   
   // Save notes to localStorage when notes change
   useEffect(() => {
@@ -65,22 +76,28 @@ const Dashboard= () => {
   };
 
   // Save note
-  const saveNote = () => {
+  const saveNote = async () => {
     if (!noteTitle.trim() && !noteContent.trim() && !attachmentPreview) return;
-    
+  
     const newNote = {
-      id: Date.now().toString(),
       title: noteTitle.trim(),
       content: noteContent.trim(),
       attachment: attachmentPreview,
       category: activeCategory === 'All' ? 'Uncategorized' : activeCategory,
       color: pastelColors[Math.floor(Math.random() * pastelColors.length)],
-      createdAt: new Date().toISOString(),
+      createdAt: serverTimestamp(),
+      userId: auth.currentUser?.uid,
       isPinned: false
     };
-    
-    setNotes([newNote, ...notes]);
-    resetForm();
+  
+    try {
+      const docRef = await addDoc(collection(db, "notes"), newNote);
+      console.log("Document written with ID: ", docRef.id);
+      setNotes([newNote, ...notes]);
+      resetForm();
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
   };
   
   // Reset form after saving
@@ -93,15 +110,26 @@ const Dashboard= () => {
   };
   
   // Delete note
-  const deleteNote = (id) => {
-    setNotes(notes.filter(note => note.id !== id));
+  const deleteNote = async (id) => {
+    try {
+      await deleteDoc(doc(db, "notes", id));
+      setNotes(notes.filter(note => note.id !== id));
+    } catch (e) {
+      console.error("Error deleting document: ", e);
+    }
   };
   
   // Toggle pin status
-  const togglePin = (id) => {
-    setNotes(notes.map(note => 
-      note.id === id ? {...note, isPinned: !note.isPinned} : note
-    ));
+  const togglePin = async (id) => {
+    const note = notes.find(note => note.id === id);
+    if (!note) return;
+  
+    try {
+      await updateDoc(doc(db, "notes", id), { isPinned: !note.isPinned });
+      setNotes(notes.map(note => note.id === id ? { ...note, isPinned: !note.isPinned } : note));
+    } catch (e) {
+      console.error("Error updating document: ", e);
+    }
   };
   
   // Handle note drag and drop
