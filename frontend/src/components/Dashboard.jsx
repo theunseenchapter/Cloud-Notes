@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-
+import { signOut } from "firebase/auth";
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
-import { db, auth } from "../firebaseConfig";
-import { doc, deleteDoc } from "firebase/firestore";
-import { updateDoc } from "firebase/firestore";
+import { db, auth } from "../firebaseConfig"; // Combined import
+import { doc, deleteDoc, updateDoc } from "firebase/firestore"; // Combined firestore imports
 // Pastel color palette for notes
 const pastelColors = [
   '#fff8e1', '#f3e5f5', '#e1f5fe', '#e8f5e9', '#fff3e0', 
@@ -20,7 +19,7 @@ const Dashboard= () => {
   const [noteContent, setNoteContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [attachment,setAttachment] = useState(null);
+  const [_attachment,setAttachment] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -32,17 +31,19 @@ const Dashboard= () => {
   
   // Load notes from localStorage on initial render
   useEffect(() => {
-    const fetchNotes = async () => {
-      if (!auth.currentUser) return;
-  
-      const q = query(collection(db, "notes"), where("userId", "==", auth.currentUser.uid));
-      const querySnapshot = await getDocs(q);
-      const fetchedNotes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotes(fetchedNotes);
-    };
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const q = query(collection(db, "notes"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        const fetchedNotes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setNotes(fetchedNotes);
+      } else {
+        setNotes([]);
+      }
+    });
 
-    fetchNotes(); // Moved outside the function to avoid infinite recursion
-  }, [auth.currentUser]); // `auth.currentUser` is not a valid dependency; use `onAuthStateChanged`
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('darkMode');
@@ -76,30 +77,69 @@ const Dashboard= () => {
     }
   };
 
-  // Save note
-  const saveNote = async () => {
-    if (!noteTitle.trim() && !noteContent.trim() && !attachmentPreview) return;
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+    console.log("User logged out");
+  } catch (error) {
+    console.error("Error logging out:", error);
+  }
+};
+
+// Create a utility function to safely format dates
+const formatDate = (timestamp) => {
+  if (!timestamp) return "";
   
-    const newNote = {
-      title: noteTitle.trim(),
-      content: noteContent.trim(),
-      attachment: attachmentPreview,
-      category: activeCategory === 'All' ? 'Uncategorized' : activeCategory,
-      color: pastelColors[Math.floor(Math.random() * pastelColors.length)],
-      createdAt: serverTimestamp(),
-      userId: auth.currentUser?.uid,
-      isPinned: false
-    };
+  // If it's a Firestore timestamp with seconds
+  if (timestamp.seconds) {
+    return new Date(timestamp.seconds * 1000).toLocaleDateString();
+  }
   
-    try {
-      const docRef = await addDoc(collection(db, "notes"), newNote);
-      console.log("Document written with ID: ", docRef.id);
-      setNotes([newNote, ...notes]);
-      resetForm();
-    } catch (e) {
-      console.error("Error adding document: ", e);
-    }
+  // If it's a regular Date object
+  if (timestamp instanceof Date) {
+    return timestamp.toLocaleDateString();
+  }
+  
+  // Try to parse it as a regular timestamp
+  try {
+    return new Date(timestamp).toLocaleDateString();
+  } catch (e) {
+    return ""; // Return empty string if all else fails
+  }
+};
+
+// Save note
+const saveNote = async () => {
+  if (!noteTitle.trim() && !noteContent.trim() && !attachmentPreview) return;
+
+  const newNote = {
+    title: noteTitle.trim(),
+    content: noteContent.trim(),
+    attachment: attachmentPreview,
+    category: activeCategory === 'All' ? 'Uncategorized' : activeCategory,
+    color: pastelColors[Math.floor(Math.random() * pastelColors.length)],
+    createdAt: serverTimestamp(), // This is for Firestore
+    userId: auth.currentUser?.uid,
+    isPinned: false
   };
+
+  try {
+    const docRef = await addDoc(collection(db, "notes"), newNote);
+    console.log("Document written with ID: ", docRef.id);
+    
+    // Add the note with a JavaScript Date for immediate display
+    setNotes([{ 
+      ...newNote, 
+      id: docRef.id,
+      createdAt: { seconds: Math.floor(Date.now() / 1000) } // Add seconds property for consistency
+    }, ...notes]);
+    
+    resetForm();
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+};
   
   // Reset form after saving
   const resetForm = () => {
@@ -253,7 +293,7 @@ const Dashboard= () => {
         .app.dark .search-input {
           background-color: rgba(255, 255, 255, 0.05);
           border-color: var(--border-dark);
-          color: var(--dark-text);
+          color: var (--dark-text);
         }
         
         .search-input:focus {
@@ -490,7 +530,7 @@ const Dashboard= () => {
           background-color: var(--light-card);
           border-radius: var(--radius);
           overflow: hidden;
-          transition: var(--transition);
+          transition: var (--transition);
           box-shadow: var(--shadow-sm);
           border: 1px solid var(--border-light);
           display: flex;
@@ -644,7 +684,6 @@ const Dashboard= () => {
         }
       `}</style>
       
-
       <div className={`app ${darkMode ? 'dark' : ''}`}>
         <header className="header">
           <div className="app-title">
@@ -656,41 +695,20 @@ const Dashboard= () => {
           <input
             type="text"
             placeholder="Search notes..."
-            style={{
-              padding: '10px',
-              fontSize: '16px',
-              width: '250px',
-              borderRadius: '10px',
-              border: '1px solid #ddd',
-              backgroundColor: '#f5f5f5',
-              outline: 'none'
-            }}
             className="search-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           
           <button onClick={toggleDarkMode} className="dark-mode-toggle" aria-label="Toggle dark mode">
-            {darkMode ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-            )}
+            {darkMode ? "🌙" : "☀️"}
+          </button>
+          
+          <button onClick={handleLogout} className="logout-button">
+            Logout
           </button>
         </header>
-
+        
         <div className="container">
           <aside className="sidebar">
             <div className="sidebar-items">
@@ -824,7 +842,7 @@ const Dashboard= () => {
                                 />
                                 {note.attachment && <img src={note.attachment} alt="Note attachment" />}
                                 <div className="note-card-footer">
-                                  <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                                  <span>{formatDate(note.createdAt)}</span>
                                   <div className="note-card-actions">
                                     <button 
                                       className={`note-action-btn pin-btn ${note.isPinned ? 'active' : ''}`}
@@ -890,7 +908,7 @@ const Dashboard= () => {
                                 />
                                 {note.attachment && <img src={note.attachment} alt="Note attachment" />}
                                 <div className="note-card-footer">
-                                  <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                                  <span>{formatDate(note.createdAt)}</span>
                                   <div className="note-card-actions">
                                     <button 
                                       className={`note-action-btn pin-btn ${note.isPinned ? 'active' : ''}`}
