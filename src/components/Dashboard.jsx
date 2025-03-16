@@ -22,6 +22,13 @@ const Dashboard= () => {
   const [_attachment,setAttachment] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  // Add state for mobile sidebar
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
+  // Toggle mobile sidebar
+  const toggleMobileSidebar = () => {
+    setIsMobileSidebarOpen(!isMobileSidebarOpen);
+  };
   
   // Categories
   const categories = ['All', 'Work', 'Personal', 'Ideas', 'Archive'];
@@ -109,17 +116,20 @@ const formatDate = (timestamp) => {
   }
 };
 
-// Save note
+// Update your saveNote function
 const saveNote = async () => {
   if (!noteTitle.trim() && !noteContent.trim() && !attachmentPreview) return;
+
+  // Use the current active category or "Uncategorized" if on "All"
+  const noteCategory = activeCategory === 'All' ? 'Uncategorized' : activeCategory;
 
   const newNote = {
     title: noteTitle.trim(),
     content: noteContent.trim(),
     attachment: attachmentPreview,
-    category: activeCategory === 'All' ? 'Uncategorized' : activeCategory,
+    category: noteCategory, // Set the category based on active selection
     color: pastelColors[Math.floor(Math.random() * pastelColors.length)],
-    createdAt: serverTimestamp(), // This is for Firestore
+    createdAt: serverTimestamp(),
     userId: auth.currentUser?.uid,
     isPinned: false
   };
@@ -129,11 +139,11 @@ const saveNote = async () => {
     console.log("Document written with ID: ", docRef.id);
     
     // Add the note with a JavaScript Date for immediate display
-    setNotes([{ 
+    setNotes(prevNotes => [{ 
       ...newNote, 
       id: docRef.id,
-      createdAt: { seconds: Math.floor(Date.now() / 1000) } // Add seconds property for consistency
-    }, ...notes]);
+      createdAt: { seconds: Math.floor(Date.now() / 1000) } 
+    }, ...prevNotes]);
     
     resetForm();
   } catch (e) {
@@ -147,7 +157,8 @@ const saveNote = async () => {
     setNoteContent('');
     setAttachment(null);
     setAttachmentPreview(null);
-    setIsExpanded(false);
+    // Keep the form expanded after saving
+    // setIsExpanded(false); - Remove this line
   };
   
   // Delete note
@@ -197,541 +208,38 @@ const saveNote = async () => {
 
   return (
     <>
-      <style jsx>{`
-        /* Base styles */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        :root {
-          --primary: #fbbc04;
-          --primary-light: #fff8e6;
-          --dark-bg: #202124;
-          --dark-card: #2d2e30;
-          --dark-text: #e8eaed;
-          --light-bg: #f5f5f5;
-          --light-card: #ffffff;
-          --light-text: #202124;
-          --border-light: #dadce0;
-          --border-dark: #5f6368;
-          --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
-          --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.15);
-          --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
-          --radius: 8px;
-          --radius-lg: 12px;
-          --transition: all 0.2s ease;
-        }
-        
-        * {
-          box-sizing: border-box;
-          margin: 0;
-          padding: 0;
-        }
-        
-        body {
-          font-family: 'Inter', sans-serif;
-          background-color: var(--light-bg);
-          color: var(--light-text);
-          margin: 0;
-          padding: 0;
-          transition: var(--transition);
-        }
-        
-        .app {
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-        }
-        
-        .app.dark {
-          background-color: var(--dark-bg);
-          color: var(--dark-text);
-        }
-        
-        .app.dark .header,
-        .app.dark .note-form,
-        .app.dark .note-card {
-          background-color: var(--dark-card);
-          border-color: var(--border-dark);
-        }
-        
-        /* Header */
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 24px;
-          background-color: var(--light-card);
-          box-shadow: var(--shadow-sm);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          transition: var(--transition);
-        }
-        
-        .app-title {
-          font-size: 22px;
-          font-weight: 600;
-          margin-right:20px;
-
-          color: var(--primary);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .search-input {
-          flex: 1;
-          max-width: 600px;
-          padding: 12px 16px;
-          border-radius: 8px;
-          border: 1px solid var(--border-light);
-          font-size: 14px;
-          outline: none;
-          transition: var(--transition);
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .search-input {
-          background-color: rgba(255, 255, 255, 0.05);
-          border-color: var(--border-dark);
-          color: var (--dark-text);
-        }
-        
-        .search-input:focus {
-          border-color: var(--primary);
-          box-shadow: var(--shadow-sm);
-        }
-        
-        .dark-mode-toggle {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--light-text);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          transition: var(--transition);
-        }
-        
-        .app.dark .dark-mode-toggle {
-          color: var(--dark-text);
-        }
-        
-        .dark-mode-toggle:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .dark-mode-toggle:hover {
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        
-        /* Layout */
-        .container {
-          display: flex;
-          flex-grow: 1;
-          width: 100%; /* Ensure the container takes full width */
-          min-height: calc(100vh - 64px); /* Use min-height instead of fixed height */
-          max-width: 100%; /* Ensure it doesn't exceed viewport width */
-        }
-        
-        /* Sidebar */
-        .sidebar {
-          width: 250px; /* Fixed width */
-          flex-shrink: 0; /* Prevent sidebar from shrinking */
-          padding: 20px 8px;
-          height: calc(100vh - 64px);
-          position: sticky;
-          top: 64px;
-          overflow-y: auto;
-          transition: var(--transition);
-        }
-        
-        .sidebar-item {
-          display: flex;
-          align-items: center;
-          padding: 12px 16px;
-          border-radius: 0 24px 24px 0;
-          margin-bottom: 4px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: var(--transition);
-        }
-        
-        .sidebar-item:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .sidebar-item:hover {
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar-item.active {
-          background-color: var(--primary-light);
-          color: var(--primary);
-        }
-        
-        .app.dark .sidebar-item.active {
-          background-color: rgba(251, 188, 4, 0.2);
-          color: var(--primary);
-        }
-        
-        /* Main content */
-        .main {
-          flex-grow: 1;
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          overflow-y: auto;
-          /* Remove the fixed width calculation that's causing the issue */
-          width: auto; /* Let it take the remaining space naturally */
-          max-width: 100%; /* Ensure proper containment */
-        }
-        
-        /* Note form */
-        .note-form {
-          width: 100%;
-          max-width: 600px;
-          background: var(--light-card);
-          border-radius: var(--radius);
-          box-shadow: var(--shadow-md);
-          overflow: hidden;
-          transition: var(--transition);
-          margin-bottom: 32px;
-          border: 1px solid var(--border-light);
-        }
-        
-        .note-form.expanded {
-          box-shadow: var(--shadow-lg);
-        }
-        
-        .note-title {
-          width: 100%;
-          padding: 16px;
-          border: none;
-          outline: none;
-          font-size: 16px;
-          font-weight: 500;
-          background: transparent;
-          color: inherit;
-        }
-        
-        .note-title::placeholder {
-          color: #9aa0a6;
-        }
-        
-        .quill-container {
-          padding: 0 16px;
-        }
-        
-        .quill {
-          border: none !important;
-        }
-        
-        .quill .ql-toolbar {
-          border: none !important;
-          border-top: 1px solid var(--border-light) !important;
-          border-bottom: 1px solid var(--border-light) !important;
-        }
-        
-        .app.dark .quill .ql-toolbar {
-          border-color: var(--border-dark) !important;
-        }
-        
-        .quill .ql-container {
-          border: none !important;
-          font-family: 'Inter', sans-serif;
-        }
-        
-        .attachment-preview {
-          max-width: 100%;
-          max-height: 200px;
-          margin: 16px;
-          border-radius: 4px;
-        }
-        
-        .form-actions {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 16px;
-          background-color: var(--light-card);
-        }
-        
-        .file-input-container {
-          position: relative;
-          overflow: hidden;
-          display: inline-block;
-        }
-        
-        .file-input {
-          position: absolute;
-          left: 0;
-          top: 0;
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-        
-        .file-label {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          cursor: pointer;
-          transition: var(--transition);
-        }
-        
-        .file-label:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .file-label:hover {
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        
-        .save-button {
-          background-color: transparent;
-          border: none;
-          color: var(--primary);
-          font-weight: 600;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: var(--transition);
-        }
-        
-        .save-button:hover {
-          background-color: rgba(251, 188, 4, 0.1);
-        }
-        
-        /* Note Grid */
-        .section-title {
-          width: 100%;
-          max-width: 1200px; /* Add a reasonable max-width */
-          margin-top: 16px;
-          margin-bottom: 8px;
-          font-size: 14px;
-          color: #5f6368;
-          font-weight: 500;
-        }
-        
-        .app.dark .section-title {
-          color: #9aa0a6;
-        }
-        
-        .notes-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-          gap: 16px;
-          width: 100%;
-          max-width: 1200px; /* Add a reasonable max-width that looks good on large screens */
-          margin-bottom: 32px;
-        }
-        
-        .note-card {
-          background-color: var(--light-card);
-          border-radius: var(--radius);
-          overflow: hidden;
-          transition: var (--transition);
-          box-shadow: var(--shadow-sm);
-          border: 1px solid var(--border-light);
-          display: flex;
-          flex-direction: column;
-          break-inside: avoid;
-        }
-        
-        .note-card:hover.note-card:hover {
-          box-shadow: var(--shadow-md);
-          transform: translateY(-2px);
-        }
-        
-        .note-card-header {
-          padding: 16px 16px 8px;
-        }
-        
-        .note-card-title {
-          font-size: 16px;
-          font-weight: 500;
-          margin-bottom: 8px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-        }
-        
-        .note-card-content {
-          padding: 0 16px 16px;
-          font-size: 14px;
-          flex-grow: 1;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          display: -webkit-box;
-          -webkit-line-clamp: 6;
-          -webkit-box-orient: vertical;
-        }
-        
-        .note-card-content img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 4px;
-          margin-top: 8px;
-        }
-        
-        .note-card-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 16px;
-          border-top: 1px solid #f1f3f4;
-          font-size: 12px;
-          color: #80868b;
-        }
-        
-        .app.dark .note-card-footer {
-          border-color: var(--border-dark);
-          color: #9aa0a6;
-        }
-        
-        .note-card-actions {
-          display: flex;
-          gap: 8px;
-        }
-        
-        .note-action-btn {
-          background: transparent;
-          border: none;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          color: #80868b;
-          transition: var(--transition);
-          padding: 0;
-        }
-        
-        .note-action-btn:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .note-action-btn:hover {
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        
-        .pin-btn.active {
-          color: var(--primary);
-        }
-        
-        /* Empty state */
-        .empty-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 60px 20px;
-          text-align: center;
-          color: #80868b;
-        }
-        
-        .empty-state-icon {
-          font-size: 48px;
-          margin-bottom: 16px;
-          color: #dadce0;
-        }
-        
-        .app.dark .empty-state-icon {
-          color: #5f6368;
-        }
-        
-        .empty-state-text {
-          font-size: 16px;
-          margin-bottom: 8px;
-        }
-        
-        .empty-state-subtext {
-          font-size: 14px;
-          opacity: 0.8;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-          .container {
-            flex-direction: column;
-            height: auto; /* Adjust height for mobile view */
-          }
-          
-          .sidebar {
-            width: 100%;
-            height: auto;
-            position: static;
-            padding: 8px;
-            overflow-x: auto; /* Fix the incomplete property */
-            display: flex;
-      }
-          
-          .main {
-            width: 100%; /* Full width on mobile */
-          }
-          
-          .sidebar-items {
-            display: flex;
-            overflow-x: auto;
-            padding-bottom: 8px;
-            width: 100%; /* Ensure full width */
-          }
-          
-          .sidebar-item {
-            border-radius: var(--radius);
-            white-space: nowrap;
-          }
-          
-          .notes-grid {
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          }
-        }
-
-        /* Add styles for logout button */
-        .logout-button {
-          background: none;
-          border: none;
-          color: var(--light-text);
-          cursor: pointer;
-          padding: 8px 16px;
-          border-radius: 4px;
-          font-weight: 500;
-          transition: var(--transition);
-          margin-left: 10px;
-        }
-        
-        .logout-button:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .app.dark .logout-button {
-          color: var(--dark-text);
-        }
-        
-        .app.dark .logout-button:hover {
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-      `}</style>
+     
       
       <div className={`app ${darkMode ? 'dark' : ''}`}>
         <header className="header">
+          {/* Add mobile sidebar toggle button */}
+          <button 
+            className="mobile-sidebar-toggle" 
+            onClick={toggleMobileSidebar}
+            aria-label="Toggle sidebar"
+            style={{ 
+              display: 'none', // Hidden by default, shown in media query
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              marginRight: '8px',
+              padding: '0'
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          
           <div className="app-title">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"></path>
             </svg>
             Notes
           </div>
+          
           <input
             type="text"
             placeholder="Search notes..."
@@ -749,14 +257,44 @@ const saveNote = async () => {
           </button>
         </header>
         
+        {/* Add overlay for mobile sidebar */}
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          style={{ 
+            display: isMobileSidebarOpen ? 'block' : 'none',
+            position: 'fixed',
+            top: '64px',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 90
+          }}
+        ></div>
+        
         <div className="container">
-          <aside className="sidebar">
+          <aside className="sidebar" style={{
+            left: isMobileSidebarOpen ? '0' : '-250px', // Only for mobile
+            '@media (max-width: 768px)': {
+              position: 'fixed',
+              width: '250px',
+              height: 'calc(100vh - 64px)',
+              zIndex: 100,
+              transition: 'left 0.3s ease',
+              boxShadow: 'var(--shadow-md)',
+              backgroundColor: 'var(--light-bg)'
+            }
+          }}>
             <div className="sidebar-items">
               {categories.map((category) => (
                 <div
                   key={category}
                   className={`sidebar-item ${activeCategory === category ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(category)}
+                  onClick={() => {
+                    setActiveCategory(category);
+                    setIsMobileSidebarOpen(false); // Close sidebar after selection on mobile
+                  }}
                 >
                   {category === 'All' && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '12px'}}>
@@ -797,15 +335,14 @@ const saveNote = async () => {
 
           <main className="main">
             <div className={`note-form ${isExpanded ? 'expanded' : ''}`} onClick={() => !isExpanded && setIsExpanded(true)}>
-              {isExpanded && (
-                <input
-                  type="text"
-                  placeholder="Title"
-                  className="note-title"
-                  value={noteTitle}
-                  onChange={(e) => setNoteTitle(e.target.value)}
-                />
-              )}
+              {/* Always show the title input */}
+              <input
+                type="text"
+                placeholder="Title"
+                className="note-title"
+                value={noteTitle}
+                onChange={(e) => setNoteTitle(e.target.value)}
+              />
               
               <div className="quill-container">
                 <ReactQuill
@@ -813,11 +350,11 @@ const saveNote = async () => {
                   onChange={setNoteContent}
                   placeholder="Take a note..."
                   modules={{
-                    toolbar: isExpanded ? [
+                    toolbar: [
                       ['bold', 'italic', 'underline'],
                       [{'list': 'ordered'}, {'list': 'bullet'}],
                       ['link']
-                    ] : false
+                    ]
                   }}
                 />
               </div>
@@ -826,29 +363,27 @@ const saveNote = async () => {
                 <img src={attachmentPreview} alt="Attachment Preview" className="attachment-preview" />
               )}
               
-              {isExpanded && (
-                <div className="form-actions">
-                  <div className="file-input-container">
-                    <input 
-                      type="file" 
-                      id="file-input" 
-                      className="file-input" 
-                      onChange={handleFileChange} 
-                      accept="image/*"
-                    />
-                    <label htmlFor="file-input" className="file-label">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                      </svg>
-                    </label>
-                  </div>
-                  <button className="save-button" onClick={saveNote}>
-                    Save
-                  </button>
+              <div className="form-actions">
+                <div className="file-input-container">
+                  <input 
+                    type="file" 
+                    id="file-input" 
+                    className="file-input" 
+                    onChange={handleFileChange} 
+                    accept="image/*"
+                  />
+                  <label htmlFor="file-input" className="file-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                  </label>
                 </div>
-              )}
+                <button className="save-button" onClick={saveNote}>
+                  Save
+                </button>
+              </div>
             </div>
 
             <DragDropContext onDragEnd={onDragEnd}>
